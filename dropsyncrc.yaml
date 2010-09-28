@@ -1,0 +1,8 @@
+---
+dropbox_location: ""
+dropsync_folder: "dropsync"
+files:
+    - "File 1"
+    - "File 2"
+    - "File 3"
+---

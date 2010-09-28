@@ -16,11 +16,28 @@ Then for every file *YOU* have decided, *dropsync* will do the following:
 
 h2. Usage
 
-TO BE COMPLETED
+<pre>
+dropsync [-h|--help] [--version] [--verbose|-v] [--debug|-d]
+    [--config-file|-f <path to config file>]
+
+    --help, -h          : Print this help, then exit
+    --version           : Print the script version, then exit
+    --verbose, -v       : Enable verbose mode
+    --debug, -d         : Enable debug mode
+
+    --config-file, -f   : Alternate location for the configuration file
+                          (Default: $HOME/.dropsyncrc.yaml)
+</pre>
 
 h2. Configuration file
 
-TO BE COMPLETED
+*dropsync* uses a YAML-formatted configuration file. It is mainly used to specify the list of files you would like to sync with your dropsync folder.
+
+The default location for this configuration file is @$HOME/.dropsyncrc.yaml@, where @$HOME@ is your home folder. This can be overriden using the @--config-file@ or @-f@ option when calling the @dropsync@ script.
+
+You can also use it to change some parameters (like the location of your Dropbox folder, or the name of the dropsync folder) to non-default values.
+
+An example of configuration is given in the @dropsyncrc.yaml@ file.
 
 h2. Planned (i.e. someday) features
 

@@ -33,6 +33,7 @@ use warnings;
 use Getopt::Long;					# To easily retrieve arguments from command-line
 use Term::ANSIColor qw(:constants);	# Colored output for the terminal
 use YAML;							# To parse the config file
+use Data::Dumper;					# Dump data structues (mainly used for debug)
 
 #-----------------------------------------------------------------------------
 
@@ -66,7 +67,10 @@ my $DEBUG = 0;						# Debug mode
 # Script specific variables
 #
 my $config_file = $ENV{'HOME'}."/.dropsyncrc.yaml";	# Default location of config file
-my %config;											# Configuration read from file
+my $config;
+
+my $dropbox_location = $ENV{'HOME'}."/Dropbox";
+my $dropsync_folder = "dropsync";
 
 #-----------------------------------------------------------------------------
 
@@ -120,11 +124,65 @@ EOF
 # Core code
 #
 
+#
+# Read configuration from the specified file
+$config = read_config_file($config_file);
+#
+
+#
+# dropsync folder location management
+#
+my $src_folder = setup_src_folder();
+
+#
+# Files backup/update
+# TODO: implement actual backup/update of files
+#
+ohai "Syncing selected files." if $VERBOSE;
+for my $file (@{$config->{'files'}}) {
+	say $file if $DEBUG;
+}
+
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 # Additional functions
 #
+sub read_config_file {
+	my $file = shift;
+	
+	# Try to open the configuration file or die
+	unless (-f $file) {
+		fail "Configuration file $file does not exist!"; exit 2;
+	} elsif ($VERBOSE) { ohai "Reading configuration from $file."; }
+
+	# Read the configuration to a hash
+	# NOTE: config_array and config_string should be empty
+	my ($config_hash, $config_array, $config_string) = YAML::LoadFile($file);
+	ohai "Read configuration:\n", Dumper($config_hash, $config_array, $config_string) if ($DEBUG);
+	oops "Some unnamed variables were found while reading config file $_. They will be ignored."
+		if (defined $config_array || defined $config_string);
+	return $config_hash;
+}
+
+sub setup_src_folder {
+	# Update the location of the Dropbox location
+	# and the dropsync folder if required
+	$dropbox_location = $config->{'dropbox_location'}
+		if (exists $config->{'dropbox_location'} && !$config->{'dropbox_location'} eq "");
+	$dropsync_folder = $config->{'dropsync_folder'}
+		if (exists $config->{'dropsync_folder'} && !$config->{'dropsync_folder'} eq "");
+
+	# Create the dropsync folder if required
+	my $src = $dropbox_location."/".$dropsync_folder;
+	unless (-d $src) {
+		mkdir $src;
+		ohai "Creating non-existing dropsync folder at $src."
+			if $VERBOSE;
+	}
+	say "Using ", BOLD, "$src", RESET, " as source folder." if $VERBOSE;
+	return $src;
+}
 
 #-----------------------------------------------------------------------------
 

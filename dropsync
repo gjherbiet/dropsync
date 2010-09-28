@@ -53,7 +53,7 @@ my $OPTIONS_VALID;					# Are the passed options valid ?
 my @ARGS = @ARGV;					# Array of passed options
 my $COMMAND = `basename $0`;		# Name of the script
 chomp($COMMAND);
-my $VERSION = "";					# Version of this script
+my $VERSION = "0.0a";				# Version of this script
 
 #
 # Generic variables
@@ -90,6 +90,8 @@ $COMMAND [-h|--help] [--version]
 
     --help, -h          : Print this help, then exit
     --version           : Print the script version, then exit
+    --verbose, -v       : Enable verbose mode
+    --debug, -d         : Enable debug mode
 EOF
 	exit $exitval;
 }

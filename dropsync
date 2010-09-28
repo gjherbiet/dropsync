@@ -32,6 +32,7 @@ use warnings;
 #
 use Getopt::Long;					# To easily retrieve arguments from command-line
 use Term::ANSIColor qw(:constants);	# Colored output for the terminal
+use YAML;							# To parse the config file
 
 #-----------------------------------------------------------------------------
 
@@ -64,6 +65,8 @@ my $DEBUG = 0;						# Debug mode
 #
 # Script specific variables
 #
+my $config_file = $ENV{'HOME'}."/.dropsyncrc.yaml";	# Default location of config file
+my %config;											# Configuration read from file
 
 #-----------------------------------------------------------------------------
 
@@ -75,7 +78,8 @@ $OPTIONS_VALID = GetOptions(
 	'help|h'	 => sub { USAGE(); },
 	'version'	 => sub { VERSION_MESSAGE(); },
 	'verbose|v+' => \$VERBOSE,
-	'debug|d'	 => sub { $VERBOSE = 1; $DEBUG = 1; }
+	'debug|d'	 => sub { $VERBOSE = 1; $DEBUG = 1; },
+	'config-file|f=s' => \$config_file,
 );
 
 unless ($OPTIONS_VALID) {
@@ -86,12 +90,16 @@ unless ($OPTIONS_VALID) {
 sub USAGE {
 	my $exitval = defined($_) ? $_ : 0;
 	print <<EOF;
-$COMMAND [-h|--help] [--version]
+$COMMAND [-h|--help] [--version] [--verbose|-v] [--debug|-d]
+    [--config-file|-f <path to config file>]
 
     --help, -h          : Print this help, then exit
     --version           : Print the script version, then exit
     --verbose, -v       : Enable verbose mode
     --debug, -d         : Enable debug mode
+
+    --config-file, -f   : Alternate location for the configuration file
+                          (Default: \$HOME/.dropsyncrc.yaml)
 EOF
 	exit $exitval;
 }

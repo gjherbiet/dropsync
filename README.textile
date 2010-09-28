@@ -1,0 +1,33 @@
+h1. *dropsync*, a DropBox configuration files synchronization utility
+
+*dropsync* is a Perl script that will automatically place your selected set of configuration files (e.g. @.profile@, @.bashrc@, @plist@ files in Mac OS X users' @Library@ folder, etc.)
+
+h2. General behavior
+
+*dropsync* will first create a @dropsync@ folder in your @Dropbox@ folder (generally @/home/<username>/Dropbox@ or @/Users/<Username>/Dropbox@ under Mac OS X).
+
+Then for every file *YOU* have decided, *dropsync* will do the following:
+
+* If the file is in its original location (e.g. @/home/<username>/.bashrc@) but *NOT* in the @dropsync@ folder, the file will be moved to the @dropsync@ (e.g. @dropbox/.bashrc@) folder and replaced by a symbolic link (e.g. @/home/<username>/.bashrc -> dropbox/.bashrc@).
+
+* If the file is present in the @dropsync@ folder (e.g. @dropsync/.bashrc@) but no symlink pointing to this location is present, the symlink will be created (e.g. @/home/<username>/.bashrc -> dropbox/.bashrc@).
+
+* If the file is present in the @dropsync@ folder (e.g. @dropsync/.bashrc@) and a file exists in the original location (e.g. @/home/<username>/.bashrc@), the original file will be moved for backup (e.g. @/home/<username>/.bashrc_ds<timestamp>@) and a new symbolic link will be created (e.g. @/home/<username>/.bashrc -> dropbox/.bashrc@).
+
+h2. Usage
+
+TO BE COMPLETED
+
+h2. Configuration file
+
+TO BE COMPLETED
+
+h2. Planned (i.e. someday) features
+
+* Machine-specific version of files
+* Logging mechanism
+
+h2. License
+
+This script is licensed under the "GPL v.3":http://www.gnu.org/licenses/
+license. See previous link or @gpl-3.0.txt@ for further details.

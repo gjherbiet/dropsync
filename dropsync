@@ -57,7 +57,7 @@ my $OPTIONS_VALID;					# Are the passed options valid ?
 my @ARGS = @ARGV;					# Array of passed options
 my $COMMAND = `basename $0`;		# Name of the script
 chomp($COMMAND);
-my $VERSION = "0.1.1";				# Version of this script
+my $VERSION = "0.2";				# Version of this script
 
 #
 # Generic variables
@@ -160,9 +160,14 @@ for my $file (@{$config->{'files'}}) {
 			readlink($ENV{'HOME'}."/".$file) eq $src_folder."/".$file) {
 		say CYAN, "$file", RESET, " is correctly linked with dropsync." if $VERBOSE;
 	}
-	elsif (	-f $src_folder."/".$file && -e $ENV{'HOME'}."/".$file) {
-		say CYAN, "$file", RESET, " requires its link with dropsync to be fixed." if $VERBOSE;
+	elsif (	-f $src_folder."/".$file && -l $ENV{'HOME'}."/".$file &&
+			!readlink($ENV{'HOME'}."/".$file) eq $src_folder."/".$file) {
+		say CYAN, "$file", RESET, " link to dropsync needs to be fixed." if $VERBOSE;
 		fix_sync_and_link($file);
+	}
+	elsif (	-f $src_folder."/".$file && -f $ENV{'HOME'}."/".$file) {
+		say CYAN, "$file", RESET, " is in conflict and needs to be resolved." if $VERBOSE;
+		fix_conflict($file);
 	}
 	elsif ( ! -f $src_folder."/".$file && ! -e $ENV{'HOME'}."/".$file) {
 		oops CYAN, "$file", RESET, " exits neither in your file system nor in dropsync and will be ignored.";
@@ -223,17 +228,27 @@ sub move_to_dropsync_and_link {
 
 sub fix_sync_and_link {
 	my $filepath = shift;
-	if ($UNSAFE && !unlink $ENV{'HOME'}."/".$filepath) {
-		oops "Error in deleting old version of $ENV{'HOME'}."/".$filepath: $!";
-		oops "Further fixing will be ignored.";
-		return;
+	cleanup_file($ENV{'HOME'}."/".$filepath) && link_from_dropsync($filepath);
+}
+
+sub fix_conflict {
+	my $filepath = shift;
+	
+	# Read the last modification time, the newest wins
+	my $lastmod_fs = (stat $ENV{'HOME'}."/".$filepath)[9];
+	my $lastmod_ds = (stat $src_folder."/".$filepath)[9];
+	
+	if ($lastmod_fs > $lastmod_ds && cleanup_file($src_folder."/".$filepath)) {
+		say "  - Updating file in dropsync using $ENV{'HOME'}/$filepath" if $DEBUG;
+		move_to_dropsync_and_link($filepath);
 	}
-	if (!$UNSAFE && !rename $ENV{'HOME'}."/".$filepath, $ENV{'HOME'}."/".$filepath.".ds_".time) {
-		oops "Error in saving old version of $ENV{'HOME'}."/".$filepath: $!";
-		oops "Further fixing will be ignored.";
-		return;
+	elsif ($lastmod_fs <= $lastmod_ds && cleanup_file($ENV{'HOME'}."/".$filepath)) {
+		say "  - Updating file in file system using $src_folder/$filepath" if $DEBUG;
+		link_from_dropsync($filepath);
 	}
-	link_from_dropsync($filepath);
+	else {
+		oops "Conflict on $ENV{'HOME'}."/".$filepath was not resolved. This file will not updated.";
+	}
 }
 
 sub move_to_dropsync {
@@ -294,6 +309,21 @@ sub create_path_if_required {
 		oops "Error in creating required path $path: $!";
 		return 0;
 	}
+}
+
+sub cleanup_file {
+	my $complete_path = shift;
+	if ($UNSAFE && !unlink $complete_path) {
+		oops "Error in deleting old version of $complete_path: $!";
+		oops "Further fixing will be ignored.";
+		return 0;
+	}
+	elsif (!$UNSAFE && !rename $complete_path, $complete_path.".ds_".time) {
+		oops "Error in saving old version of $complete_path: $!";
+		oops "Further fixing will be ignored.";
+		return 0;
+	}
+	return 1;
 }
 
 #-----------------------------------------------------------------------------

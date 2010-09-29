@@ -67,10 +67,10 @@ my $DEBUG = 0;						# Debug mode
 # Script specific variables
 #
 my $config_file = $ENV{'HOME'}."/.dropsyncrc.yaml";	# Default location of config file
-my $config;
+my $config;											# Hashref of the config options
 
-my $dropbox_location = $ENV{'HOME'}."/Dropbox";
-my $dropsync_folder = "dropsync";
+my $dropbox_location = $ENV{'HOME'}."/Dropbox";		# DropBox folder location
+my $dropsync_folder = "dropsync";					# dropsync folder name
 
 #-----------------------------------------------------------------------------
 
@@ -159,7 +159,7 @@ sub read_config_file {
 	# Read the configuration to a hash
 	# NOTE: config_array and config_string should be empty
 	my ($config_hash, $config_array, $config_string) = YAML::LoadFile($file);
-	ohai "Read configuration:\n", Dumper($config_hash, $config_array, $config_string) if ($DEBUG);
+	ohai "Read configuration:\n", Dumper($config_hash, $config_array, $config_string) if $DEBUG;
 	oops "Some unnamed variables were found while reading config file $_. They will be ignored."
 		if (defined $config_array || defined $config_string);
 	return $config_hash;

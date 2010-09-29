@@ -34,6 +34,8 @@ use Getopt::Long;					# To easily retrieve arguments from command-line
 use Term::ANSIColor qw(:constants);	# Colored output for the terminal
 use YAML;							# To parse the config file
 use Data::Dumper;					# Dump data structues (mainly used for debug)
+use File::Basename;					# To easily manipulate files and paths
+use File::Path qw(make_path);		# To easily create required path if necessary
 
 #-----------------------------------------------------------------------------
 
@@ -62,6 +64,7 @@ my $VERSION = "0.0a";				# Version of this script
 #
 my $VERBOSE = 0;					# Verbose mode
 my $DEBUG = 0;						# Debug mode
+my $UNSAFE = 0;						# Run in unsafe mode
 
 #
 # Script specific variables
@@ -84,6 +87,7 @@ $OPTIONS_VALID = GetOptions(
 	'verbose|v+' => \$VERBOSE,
 	'debug|d'	 => sub { $VERBOSE = 1; $DEBUG = 1; },
 	'config-file|f=s' => \$config_file,
+	'unsafe+'	 => \$UNSAFE
 );
 
 unless ($OPTIONS_VALID) {
@@ -95,7 +99,7 @@ sub USAGE {
 	my $exitval = defined($_) ? $_ : 0;
 	print <<EOF;
 $COMMAND [-h|--help] [--version] [--verbose|-v] [--debug|-d]
-    [--config-file|-f <path to config file>]
+    [--config-file|-f <path to config file>] [--unsafe]
 
     --help, -h          : Print this help, then exit
     --version           : Print the script version, then exit
@@ -104,6 +108,10 @@ $COMMAND [-h|--help] [--version] [--verbose|-v] [--debug|-d]
 
     --config-file, -f   : Alternate location for the configuration file
                           (Default: \$HOME/.dropsyncrc.yaml)
+
+    --unsafe            : When run in unsafe mode, no backup of incorrect
+                          files or link in the filesystem will be kept.
+                          (This mode is not recommanded and disabled by default).
 EOF
 	exit $exitval;
 }
@@ -136,11 +144,32 @@ my $src_folder = setup_src_folder();
 
 #
 # Files backup/update
-# TODO: implement actual backup/update of files
 #
 ohai "Syncing selected files." if $VERBOSE;
 for my $file (@{$config->{'files'}}) {
-	say $file if $DEBUG;
+
+	if (-f $ENV{'HOME'}."/".$file && ! -f $src_folder."/".$file) {
+		say CYAN, "$file", RESET, " requires to be put in dropsync." if $VERBOSE;
+		move_to_dropsync_and_link($file);
+	}
+	elsif (	-f $src_folder."/".$file && ! -e $ENV{'HOME'}."/".$file) {
+		say CYAN, "$file", RESET, " requires to be linked with dropsync." if $VERBOSE;
+		link_from_dropsync($file);
+	}
+	elsif (	-f $src_folder."/".$file && -l $ENV{'HOME'}."/".$file &&
+			readlink($ENV{'HOME'}."/".$file) eq $src_folder."/".$file) {
+		say CYAN, "$file", RESET, " is correctly linked with dropsync." if $VERBOSE;
+	}
+	elsif (	-f $src_folder."/".$file && -e $ENV{'HOME'}."/".$file) {
+		say CYAN, "$file", RESET, " requires its link with dropsync to be fixed." if $VERBOSE;
+		fix_sync_and_link($file);
+	}
+	elsif ( ! -f $src_folder."/".$file && ! -e $ENV{'HOME'}."/".$file) {
+		oops CYAN, "$file", RESET, " exits neither in your file system nor in dropsync and will be ignored.";
+	}
+	else {
+		oops CYAN, "$file", RESET, " did not match any sync case managed by dropsync and will be ignored.";
+	}
 }
 
 #-----------------------------------------------------------------------------
@@ -180,8 +209,91 @@ sub setup_src_folder {
 		ohai "Creating non-existing dropsync folder at $src."
 			if $VERBOSE;
 	}
-	say "Using ", BOLD, "$src", RESET, " as source folder." if $VERBOSE;
+	say "Using ", YELLOW, "$src", RESET, " as source folder." if $VERBOSE;
 	return $src;
+}
+
+#
+# File manipulation functions
+#
+sub move_to_dropsync_and_link {
+	my $filepath = shift;
+	move_to_dropsync($filepath) && link_from_dropsync($filepath);
+}
+
+sub fix_sync_and_link {
+	my $filepath = shift;
+	if ($UNSAFE && !unlink $ENV{'HOME'}."/".$filepath) {
+		oops "Error in deleting old version of $ENV{'HOME'}."/".$filepath: $!";
+		oops "Further fixing will be ignored.";
+		return;
+	}
+	if (!$UNSAFE && !rename $ENV{'HOME'}."/".$filepath, $ENV{'HOME'}."/".$filepath.".ds_".time) {
+		oops "Error in saving old version of $ENV{'HOME'}."/".$filepath: $!";
+		oops "Further fixing will be ignored.";
+		return;
+	}
+	link_from_dropsync($filepath);
+}
+
+sub move_to_dropsync {
+	my $filepath = shift;
+	unless (-f $ENV{'HOME'}."/".$filepath) {
+		oops "  - File $filepath does not exist in your filesystem and will not be synched.";
+		return 0;
+	}
+	elsif (	-l $ENV{'HOME'}."/".$filepath && 
+			readlink($ENV{'HOME'}."/".$filepath) eq $src_folder."/".$filepath) {
+		say "  - File $filepath is already synched to $src_folder/$filepath" if $DEBUG;
+		return 0;
+	}
+	elsif (	create_path_if_required($src_folder."/".$filepath) && 
+			rename $ENV{'HOME'}."/".$filepath, $src_folder."/".$filepath) {
+		say "  - Moved $filepath to $src_folder/$filepath" if $DEBUG;
+		return 1;
+	}
+	else {
+		oops "Error in moving $filepath to $src_folder/$filepath: $!";
+		return 0;
+	}
+}
+
+sub link_from_dropsync {
+	my $filepath = shift;
+	unless (-f $src_folder."/".$filepath) {
+		oops "Synched file $src_folder/$filepath does not exist in you dropsync folder and will be ignored.";
+		return 0;
+	}
+	elsif (	-l $ENV{'HOME'}."/".$filepath && 
+			readlink($ENV{'HOME'}."/".$filepath) eq $src_folder."/".$filepath) {
+		say "  - File $filepath is already a symbolic link to $src_folder/$filepath" if $DEBUG;
+	}
+	elsif (	create_path_if_required($ENV{'HOME'}."/".$filepath) &&
+			symlink $src_folder."/".$filepath, $ENV{'HOME'}."/".$filepath) {
+		say "  - Linked $src_folder/$filepath to $filepath" if $DEBUG;
+		return 1;
+	}
+	else {
+		oops "Error in linking $src_folder/$filepath to $filepath: $!";
+		return 0;
+	}
+}
+
+sub create_path_if_required {
+	my $filepath = shift;
+	my $path = dirname($filepath);
+	if (-d $path) {
+		say "  - Required path $path already exists, no need to create" if $DEBUG;
+		return 1;
+	}
+	elsif (make_path($path)) {
+		say "  - Created required path $path" if $DEBUG;
+		return 1;
+	}
+	else {
+		oops "Error in creating required path $path: $!";
+		return 0;
+	}
 }
 
 #-----------------------------------------------------------------------------

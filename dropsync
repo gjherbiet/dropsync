@@ -32,6 +32,8 @@ use warnings;
 #
 use Getopt::Long;					# To easily retrieve arguments from command-line
 use Term::ANSIColor qw(:constants);	# Colored output for the terminal
+use YAML;							# To parse the config file
+use Data::Dumper;					# Dump data structues (mainly used for debug)
 
 #-----------------------------------------------------------------------------
 
@@ -64,6 +66,11 @@ my $DEBUG = 0;						# Debug mode
 #
 # Script specific variables
 #
+my $config_file = $ENV{'HOME'}."/.dropsyncrc.yaml";	# Default location of config file
+my $config;											# Hashref of the config options
+
+my $dropbox_location = $ENV{'HOME'}."/Dropbox";		# DropBox folder location
+my $dropsync_folder = "dropsync";					# dropsync folder name
 
 #-----------------------------------------------------------------------------
 
@@ -75,7 +82,8 @@ $OPTIONS_VALID = GetOptions(
 	'help|h'	 => sub { USAGE(); },
 	'version'	 => sub { VERSION_MESSAGE(); },
 	'verbose|v+' => \$VERBOSE,
-	'debug|d'	 => sub { $VERBOSE = 1; $DEBUG = 1; }
+	'debug|d'	 => sub { $VERBOSE = 1; $DEBUG = 1; },
+	'config-file|f=s' => \$config_file,
 );
 
 unless ($OPTIONS_VALID) {
@@ -86,12 +94,16 @@ unless ($OPTIONS_VALID) {
 sub USAGE {
 	my $exitval = defined($_) ? $_ : 0;
 	print <<EOF;
-$COMMAND [-h|--help] [--version]
+$COMMAND [-h|--help] [--version] [--verbose|-v] [--debug|-d]
+    [--config-file|-f <path to config file>]
 
     --help, -h          : Print this help, then exit
     --version           : Print the script version, then exit
     --verbose, -v       : Enable verbose mode
     --debug, -d         : Enable debug mode
+
+    --config-file, -f   : Alternate location for the configuration file
+                          (Default: \$HOME/.dropsyncrc.yaml)
 EOF
 	exit $exitval;
 }
@@ -112,11 +124,65 @@ EOF
 # Core code
 #
 
+#
+# Read configuration from the specified file
+$config = read_config_file($config_file);
+#
+
+#
+# dropsync folder location management
+#
+my $src_folder = setup_src_folder();
+
+#
+# Files backup/update
+# TODO: implement actual backup/update of files
+#
+ohai "Syncing selected files." if $VERBOSE;
+for my $file (@{$config->{'files'}}) {
+	say $file if $DEBUG;
+}
+
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 # Additional functions
 #
+sub read_config_file {
+	my $file = shift;
+	
+	# Try to open the configuration file or die
+	unless (-f $file) {
+		fail "Configuration file $file does not exist!"; exit 2;
+	} elsif ($VERBOSE) { ohai "Reading configuration from $file."; }
+
+	# Read the configuration to a hash
+	# NOTE: config_array and config_string should be empty
+	my ($config_hash, $config_array, $config_string) = YAML::LoadFile($file);
+	ohai "Read configuration:\n", Dumper($config_hash, $config_array, $config_string) if $DEBUG;
+	oops "Some unnamed variables were found while reading config file $_. They will be ignored."
+		if (defined $config_array || defined $config_string);
+	return $config_hash;
+}
+
+sub setup_src_folder {
+	# Update the location of the Dropbox location
+	# and the dropsync folder if required
+	$dropbox_location = $config->{'dropbox_location'}
+		if (exists $config->{'dropbox_location'} && !$config->{'dropbox_location'} eq "");
+	$dropsync_folder = $config->{'dropsync_folder'}
+		if (exists $config->{'dropsync_folder'} && !$config->{'dropsync_folder'} eq "");
+
+	# Create the dropsync folder if required
+	my $src = $dropbox_location."/".$dropsync_folder;
+	unless (-d $src) {
+		mkdir $src;
+		ohai "Creating non-existing dropsync folder at $src."
+			if $VERBOSE;
+	}
+	say "Using ", BOLD, "$src", RESET, " as source folder." if $VERBOSE;
+	return $src;
+}
 
 #-----------------------------------------------------------------------------
 

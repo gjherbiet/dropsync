@@ -13,7 +13,7 @@ h2. Requirements
 * @File::Basename@
 * @File::Path@
 
-It has been tested under Mac OS X 10.6.7 with Perl 5.10.0.
+It has been tested under Mac OS X 10.6.4 with Perl 5.10.0.
 
 h2. General behavior
 

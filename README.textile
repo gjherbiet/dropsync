@@ -55,6 +55,17 @@ The default location for this configuration file is @$HOME/.dropsyncrc.yaml@, wh
 
 You can also use it to change some parameters (like the location of your Dropbox folder, or the name of the dropsync folder) to non-default values.
 
+The following options are available from the configuration file:
+
+<pre>
+dropbox_location: a string defining the location of the DropBox folder, if
+                  different from the default value (default: "$HOME/Dropbox")
+dropsync_folder:  a string defining the name of the dropsync folder in you
+                  DropBox (default: "dropsync")
+files:            a YAML-formatted list of path to the files you want to sync,
+                  relative to your $HOME (e.g. ".bashrc" or ".config/somerc")
+</pre>
+
 An example of configuration is given in the @dropsyncrc.yaml@ file.
 
 h2. Planned (i.e. someday) features

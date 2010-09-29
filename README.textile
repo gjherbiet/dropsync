@@ -18,7 +18,7 @@ h2. Usage
 
 <pre>
 dropsync [-h|--help] [--version] [--verbose|-v] [--debug|-d]
-    [--config-file|-f <path to config file>]
+    [--config-file|-f <path to config file>] [--unsafe]
 
     --help, -h          : Print this help, then exit
     --version           : Print the script version, then exit
@@ -27,6 +27,11 @@ dropsync [-h|--help] [--version] [--verbose|-v] [--debug|-d]
 
     --config-file, -f   : Alternate location for the configuration file
                           (Default: $HOME/.dropsyncrc.yaml)
+
+    --unsafe            : When run in unsafe mode, no backup of incorrect
+                          files or link in the filesystem will be kept.
+                          (This mode is not recommanded and disabled by default).
+
 </pre>
 
 h2. Configuration file

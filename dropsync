@@ -99,7 +99,7 @@ sub USAGE {
 	my $exitval = defined($_) ? $_ : 0;
 	print <<EOF;
 $COMMAND [-h|--help] [--version] [--verbose|-v] [--debug|-d]
-    [--config-file|-f <path to config file>]
+    [--config-file|-f <path to config file>] [--unsafe]
 
     --help, -h          : Print this help, then exit
     --version           : Print the script version, then exit

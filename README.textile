@@ -2,6 +2,19 @@ h1. *dropsync*, a DropBox configuration files synchronization utility
 
 *dropsync* is a Perl script that will automatically place your selected set of configuration files (e.g. @.profile@, @.bashrc@, @plist@ files in Mac OS X users' @Library@ folder, etc.)
 
+h2. Requirements
+
+*dropsync* requires a fairly recent version of Perl and the following modules:
+
+* @Getopt::Long@
+* @Term::ANSIColor@
+* @YAML@
+* @Data::Dumper@
+* @File::Basename@
+* @File::Path@
+
+It has been tested under Mac OS X 10.6.7 with Perl 5.10.0.
+
 h2. General behavior
 
 *dropsync* will first create a @dropsync@ folder in your @Dropbox@ folder (generally @/home/<username>/Dropbox@ or @/Users/<Username>/Dropbox@ under Mac OS X).

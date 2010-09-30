@@ -21,11 +21,13 @@ h2. General behavior
 
 Then for every file *YOU* have decided, *dropsync* will do the following:
 
-* If the file is in its original location (e.g. @/home/<username>/.bashrc@) but *NOT* in the @dropsync@ folder, the file will be moved to the @dropsync@ (e.g. @dropbox/.bashrc@) folder and replaced by a symbolic link (e.g. @/home/<username>/.bashrc -> dropbox/.bashrc@).
+* If the file is in its original location (e.g. @/home/<username>/.bashrc@) but *NOT* in the @dropsync@ folder, the file will be copied to the @dropsync@ (e.g. @dropbox/.bashrc@) folder.
 
-* If the file is present in the @dropsync@ folder (e.g. @dropsync/.bashrc@) but no symlink pointing to this location is present, the symlink will be created (e.g. @/home/<username>/.bashrc -> dropbox/.bashrc@).
+* If the file is present in the @dropsync@ folder (e.g. @dropsync/.bashrc@) but no file is present in your filesystem, then the file in your *dropsync* folder will be copied (e.g. @/home/<username>/.bashrc@ will be copied to @dropbox/.bashrc@).
 
-* If the file is present in the @dropsync@ folder (e.g. @dropsync/.bashrc@) and a file (_note: not a symbolic link_) exists in the original location (e.g. @/home/<username>/.bashrc@), then the conflict is resolved by keeping the latest modified file and applying one of the two preceding policies accordingly.
+* If the file is present in the @dropsync@ folder (e.g. @dropsync/.bashrc@) and a file exists in the original location (e.g. @/home/<username>/.bashrc@), then the conflict is resolved by keeping the latest modified file and applying one of the two preceding policies accordingly.
+
+_Note:_ Conflic resolution policy can be modified by using one of the @force-push@ or @force-retrieve@ options described below.
 
 h2. Usage
 
@@ -41,10 +43,14 @@ dropsync [-h|--help] [--version] [--verbose|-v] [--debug|-d]
     --config-file, -f   : Alternate location for the configuration file
                           (Default: $HOME/.dropsyncrc.yaml)
 
-    --unsafe            : When run in unsafe mode, no backup of incorrect
-                          files or link in the filesystem will be kept.
-                          (This mode is not recommanded and disabled by default).
+    --force-push, -p    : Force pushing local files to the dropsync folder,
+                          whatever the conflict resolution status.
+    --force-retrieve, -r: Force retrieving local files from the dropsync folder,
+                          whatever the conflict resolution status.
 
+    --unsafe            : When run in unsafe mode, no backup of conflicting
+                          files will be kept.
+                          (This mode is not recommanded and disabled by default).
 </pre>
 
 h2. Configuration file

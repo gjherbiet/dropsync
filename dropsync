@@ -35,7 +35,9 @@ use Term::ANSIColor qw(:constants);	# Colored output for the terminal
 use YAML;							# To parse the config file
 use Data::Dumper;					# Dump data structues (mainly used for debug)
 use File::Basename;					# To easily manipulate files and paths
+use File::Copy "cp";				# Easily copy files while keeping permissions
 use File::Path qw(make_path);		# To easily create required path if necessary
+use File::Compare;					# To compare file content
 
 #-----------------------------------------------------------------------------
 
@@ -109,8 +111,8 @@ $COMMAND [-h|--help] [--version] [--verbose|-v] [--debug|-d]
     --config-file, -f   : Alternate location for the configuration file
                           (Default: \$HOME/.dropsyncrc.yaml)
 
-    --unsafe            : When run in unsafe mode, no backup of incorrect
-                          files or link in the filesystem will be kept.
+    --unsafe            : When run in unsafe mode, no backup of conflicting
+                          files will be kept.
                           (This mode is not recommanded and disabled by default).
 EOF
 	exit $exitval;
@@ -150,23 +152,14 @@ for my $file (@{$config->{'files'}}) {
 
 	if (-f $ENV{'HOME'}."/".$file && ! -f $src_folder."/".$file) {
 		say CYAN, "$file", RESET, " requires to be put in dropsync." if $VERBOSE;
-		move_to_dropsync_and_link($file);
+		safe_copy($ENV{'HOME'}."/".$file, $src_folder."/".$file);
 	}
-	elsif (	-f $src_folder."/".$file && ! -e $ENV{'HOME'}."/".$file) {
-		say CYAN, "$file", RESET, " requires to be linked with dropsync." if $VERBOSE;
-		link_from_dropsync($file);
-	}
-	elsif (	-f $src_folder."/".$file && -l $ENV{'HOME'}."/".$file &&
-			readlink($ENV{'HOME'}."/".$file) eq $src_folder."/".$file) {
-		say CYAN, "$file", RESET, " is correctly linked with dropsync." if $VERBOSE;
-	}
-	elsif (	-f $src_folder."/".$file && -l $ENV{'HOME'}."/".$file &&
-			!readlink($ENV{'HOME'}."/".$file) eq $src_folder."/".$file) {
-		say CYAN, "$file", RESET, " link to dropsync needs to be fixed." if $VERBOSE;
-		fix_sync_and_link($file);
+	elsif (	-f $src_folder."/".$file && ! -f $ENV{'HOME'}."/".$file) {
+		say CYAN, "$file", RESET, " requires to be pulled from dropsync." if $VERBOSE;
+		safe_copy($src_folder."/".$file, $ENV{'HOME'}."/".$file);
 	}
 	elsif (	-f $src_folder."/".$file && -f $ENV{'HOME'}."/".$file) {
-		say CYAN, "$file", RESET, " is in conflict and needs to be resolved." if $VERBOSE;
+		say CYAN, "$file", RESET, " exists in both your file system and in dropsync." if $VERBOSE;
 		fix_conflict($file);
 	}
 	elsif ( ! -f $src_folder."/".$file && ! -e $ENV{'HOME'}."/".$file) {
@@ -221,15 +214,6 @@ sub setup_src_folder {
 #
 # File manipulation functions
 #
-sub move_to_dropsync_and_link {
-	my $filepath = shift;
-	move_to_dropsync($filepath) && link_from_dropsync($filepath);
-}
-
-sub fix_sync_and_link {
-	my $filepath = shift;
-	cleanup_file($ENV{'HOME'}."/".$filepath) && link_from_dropsync($filepath);
-}
 
 sub fix_conflict {
 	my $filepath = shift;
@@ -238,58 +222,39 @@ sub fix_conflict {
 	my $lastmod_fs = (stat $ENV{'HOME'}."/".$filepath)[9];
 	my $lastmod_ds = (stat $src_folder."/".$filepath)[9];
 	
-	if ($lastmod_fs > $lastmod_ds && cleanup_file($src_folder."/".$filepath)) {
-		say "  - Updating file in dropsync using $ENV{'HOME'}/$filepath" if $DEBUG;
-		move_to_dropsync_and_link($filepath);
+	if (compare($ENV{'HOME'}."/".$filepath, $src_folder."/".$filepath) == 0) {
+		say "  - Files are identical, nothing will be changed." if $DEBUG;
 	}
-	elsif ($lastmod_fs <= $lastmod_ds && cleanup_file($ENV{'HOME'}."/".$filepath)) {
+	elsif ($lastmod_fs > $lastmod_ds && cleanup_file($src_folder."/".$filepath)) {
+		say "  - Updating file in dropsync using $ENV{'HOME'}/$filepath" if $DEBUG;
+		#move_to_dropsync_and_link($filepath);
+		safe_copy($ENV{'HOME'}."/".$filepath, $src_folder."/".$filepath);
+	}
+	elsif ($lastmod_fs < $lastmod_ds && cleanup_file($ENV{'HOME'}."/".$filepath)) {
 		say "  - Updating file in file system using $src_folder/$filepath" if $DEBUG;
-		link_from_dropsync($filepath);
+		safe_copy($src_folder."/".$filepath, $ENV{'HOME'}."/".$filepath);
 	}
 	else {
 		oops "Conflict on $ENV{'HOME'}."/".$filepath was not resolved. This file will not updated.";
 	}
 }
 
-sub move_to_dropsync {
-	my $filepath = shift;
-	unless (-f $ENV{'HOME'}."/".$filepath) {
-		oops "  - File $filepath does not exist in your filesystem and will not be synched.";
+sub safe_copy {
+	my ($src, $dest) = @_;
+	unless (-f $src) {
+		oops "  - Source file $src does not exist.";
 		return 0;
 	}
-	elsif (	-l $ENV{'HOME'}."/".$filepath && 
-			readlink($ENV{'HOME'}."/".$filepath) eq $src_folder."/".$filepath) {
-		say "  - File $filepath is already synched to $src_folder/$filepath" if $DEBUG;
+	elsif (	-f $dest) {
+		oops "  - Destination file $dest already exists";
 		return 0;
 	}
-	elsif (	create_path_if_required($src_folder."/".$filepath) && 
-			rename $ENV{'HOME'}."/".$filepath, $src_folder."/".$filepath) {
-		say "  - Moved $filepath to $src_folder/$filepath" if $DEBUG;
+	elsif (	create_path_if_required($dest) && cp $src, $dest) {
+		say "  - Copy $src to $dest" if $DEBUG;
 		return 1;
 	}
 	else {
-		oops "Error in moving $filepath to $src_folder/$filepath: $!";
-		return 0;
-	}
-}
-
-sub link_from_dropsync {
-	my $filepath = shift;
-	unless (-f $src_folder."/".$filepath) {
-		oops "Synched file $src_folder/$filepath does not exist in you dropsync folder and will be ignored.";
-		return 0;
-	}
-	elsif (	-l $ENV{'HOME'}."/".$filepath && 
-			readlink($ENV{'HOME'}."/".$filepath) eq $src_folder."/".$filepath) {
-		say "  - File $filepath is already a symbolic link to $src_folder/$filepath" if $DEBUG;
-	}
-	elsif (	create_path_if_required($ENV{'HOME'}."/".$filepath) &&
-			symlink $src_folder."/".$filepath, $ENV{'HOME'}."/".$filepath) {
-		say "  - Linked $src_folder/$filepath to $filepath" if $DEBUG;
-		return 1;
-	}
-	else {
-		oops "Error in linking $src_folder/$filepath to $filepath: $!";
+		oops "Error in copying $src to $dest: $!";
 		return 0;
 	}
 }
@@ -312,14 +277,14 @@ sub create_path_if_required {
 }
 
 sub cleanup_file {
-	my $complete_path = shift;
-	if ($UNSAFE && !unlink $complete_path) {
-		oops "Error in deleting old version of $complete_path: $!";
+	my $path = shift;
+	if ($UNSAFE && !unlink $path) {
+		oops "Error in deleting old version of $path: $!";
 		oops "Further fixing will be ignored.";
 		return 0;
 	}
-	elsif (!$UNSAFE && !rename $complete_path, $complete_path.".ds_".time) {
-		oops "Error in saving old version of $complete_path: $!";
+	elsif (!$UNSAFE && !rename $path, $path.".ds_".time) {
+		oops "Error in saving old version of $path: $!";
 		oops "Further fixing will be ignored.";
 		return 0;
 	}

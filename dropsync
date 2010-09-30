@@ -67,6 +67,8 @@ my $VERSION = "0.2";				# Version of this script
 my $VERBOSE = 0;					# Verbose mode
 my $DEBUG = 0;						# Debug mode
 my $UNSAFE = 0;						# Run in unsafe mode
+my $FORCED_PUSH = 0;				# Force pushing to dropsync
+my $FORCED_RETRIEVE = 0;			# Force retrieve from dropsync
 
 #
 # Script specific variables
@@ -89,7 +91,9 @@ $OPTIONS_VALID = GetOptions(
 	'verbose|v+' => \$VERBOSE,
 	'debug|d'	 => sub { $VERBOSE = 1; $DEBUG = 1; },
 	'config-file|f=s' => \$config_file,
-	'unsafe+'	 => \$UNSAFE
+	'unsafe+'			 => \$UNSAFE,
+	'force-push|p+'		 => \$FORCED_PUSH,
+	'force-retrieve|r+'	 => \$FORCED_RETRIEVE
 );
 
 unless ($OPTIONS_VALID) {
@@ -110,6 +114,11 @@ $COMMAND [-h|--help] [--version] [--verbose|-v] [--debug|-d]
 
     --config-file, -f   : Alternate location for the configuration file
                           (Default: \$HOME/.dropsyncrc.yaml)
+
+    --force-push, -p    : Force pushing local files to the dropsync folder,
+                          whatever the conflict resolution status.
+    --force-retrieve, -r: Force retrieving local files from the dropsync folder,
+                          whatever the conflict resolution status.
 
     --unsafe            : When run in unsafe mode, no backup of conflicting
                           files will be kept.
@@ -219,8 +228,8 @@ sub fix_conflict {
 	my $filepath = shift;
 	
 	# Read the last modification time, the newest wins
-	my $lastmod_fs = (stat $ENV{'HOME'}."/".$filepath)[9];
-	my $lastmod_ds = (stat $src_folder."/".$filepath)[9];
+	my $lastmod_fs = $FORCED_RETRIEVE ? 0 : (stat $ENV{'HOME'}."/".$filepath)[9];
+	my $lastmod_ds = $FORCED_PUSH ? 0 : (stat $src_folder."/".$filepath)[9];
 	
 	if (compare($ENV{'HOME'}."/".$filepath, $src_folder."/".$filepath) == 0) {
 		say "  - Files are identical, nothing will be changed." if $DEBUG;

@@ -59,7 +59,7 @@ my $OPTIONS_VALID;					# Are the passed options valid ?
 my @ARGS = @ARGV;					# Array of passed options
 my $COMMAND = `basename $0`;		# Name of the script
 chomp($COMMAND);
-my $VERSION = "0.2";				# Version of this script
+my $VERSION = "0.3";				# Version of this script
 
 #
 # Generic variables
